@@ -43,6 +43,33 @@ The installer (`scripts/install.sh`) installs the Python deps and downloads
 `cloudflared` automatically. It does **not** install Node — install that from
 your distro or [nodejs.org](https://nodejs.org) first.
 
+### About `copilot-api`
+
+This project is a **wrapper** around [`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api)
+— the reverse-engineered Copilot proxy that does the actual GitHub Copilot
+talking. **You do NOT need to clone or install it separately.** `c2p` runs it
+via `npx --yes copilot-api@latest start ...` on demand, so all you need is
+Node.js on your `PATH`.
+
+You only need to do this once:
+
+```bash
+c2p auth        # delegates to: npx copilot-api auth
+```
+
+…which performs the GitHub device-flow login and caches the token in
+`~/.local/share/copilot-api/` (used by every subsequent run). After that,
+`c2p start` will keep the upstream `copilot-api` process running for you.
+
+> If you'd rather pin a specific version or run `copilot-api` from source,
+> start it yourself on `127.0.0.1:4141` and set `C2P_UPSTREAM_PORT` /
+> `C2P_UPSTREAM` accordingly — the gateway will route to whatever is
+> listening there.
+
+All credit for the upstream Copilot proxy belongs to
+[**@ericc-ch**](https://github.com/ericc-ch). This project simply adds API
+key auth, quotas, logging, and a public tunnel on top.
+
 ---
 
 ## 🚀 Quick start
