@@ -75,7 +75,7 @@ key auth, quotas, logging, and a public tunnel on top.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<you>/copilot-Subscription-to-Public-Api.git
+git clone https://github.com/otler17/copilot-Subscription-to-Public-Api.git
 cd copilot-Subscription-to-Public-Api
 
 # 1. install Python deps + cloudflared
