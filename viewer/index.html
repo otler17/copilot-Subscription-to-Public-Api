@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang=en>
+<meta charset=utf-8>
+<title>c2p — request log viewer</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; color:#222; }
+  h1 { margin: 0 0 .5rem; }
+  form { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom: 1rem; }
+  input, button { font: inherit; padding:.4rem .6rem; }
+  input[type=text] { flex:1 1 16rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border-bottom:1px solid #eee; padding:.35rem .5rem; vertical-align: top; text-align:left; }
+  tr.req { background:#fafcff; }
+  tr.resp { background:#f5fff7; }
+  tr.fail { background:#fff3f3; }
+  pre { white-space: pre-wrap; word-break: break-word; margin:0; max-height: 14em; overflow:auto; background:#fff; border:1px solid #eee; padding:.4rem; border-radius:4px; }
+  details summary { cursor:pointer; }
+  .muted { color:#888; }
+  .pill { display:inline-block; padding: 1px 6px; border-radius: 9px; font-size: 11px; background:#eee; }
+</style>
+
+<h1>copilot-Api-to-Public-Api — log viewer</h1>
+<form id=f>
+  <input type=text id=base placeholder="Base URL (https://xxx.trycloudflare.com)" required>
+  <input type=text id=key placeholder="API key (sk-...)" required>
+  <label><input type=checkbox id=auto checked> auto-refresh 5s</label>
+  <button>Fetch</button>
+</form>
+<p id=stats class=muted></p>
+<table id=t>
+  <thead><tr><th>time</th><th>event</th><th>key</th><th>model</th><th>path</th>
+  <th>status</th><th>ms</th><th>body</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const f = document.getElementById('f');
+const base = document.getElementById('base');
+const key = document.getElementById('key');
+const auto = document.getElementById('auto');
+const stats = document.getElementById('stats');
+const tbody = document.querySelector('#t tbody');
+
+base.value = localStorage.getItem('c2p_base') || '';
+key.value  = localStorage.getItem('c2p_key')  || '';
+
+let timer = null;
+
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  localStorage.setItem('c2p_base', base.value.trim());
+  localStorage.setItem('c2p_key',  key.value.trim());
+  await refresh();
+  if (timer) clearInterval(timer);
+  if (auto.checked) timer = setInterval(refresh, 5000);
+});
+
+function fmt(ts) { return new Date(ts*1000).toLocaleTimeString(); }
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function refresh() {
+  const url = base.value.replace(/\/$/, '') + '/usage-summary?key=' + encodeURIComponent(key.value);
+  let data;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    data = await r.json();
+  } catch (e) {
+    stats.textContent = 'error: ' + e.message;
+    return;
+  }
+  stats.textContent = `${data.total_requests} requests · ${data.auth_failures} auth failures · last ${data.last_event_ts ? fmt(data.last_event_ts) : '—'}`;
+  tbody.innerHTML = '';
+  for (const e of (data.recent || []).slice().reverse()) {
+    const tr = document.createElement('tr');
+    tr.className = e.event === 'request' ? 'req' : (e.event === 'response' ? 'resp' : 'fail');
+    const body = e.request_body ?? e.response_body ?? '';
+    const bodyStr = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+    tr.innerHTML = `
+      <td>${fmt(e.ts)}</td>
+      <td><span class=pill>${e.event}</span></td>
+      <td>${esc(e.key || '—')}</td>
+      <td>${esc((e.summary && e.summary.model) || '')}</td>
+      <td>${esc(e.path || '')}</td>
+      <td>${e.status ?? ''}</td>
+      <td>${e.duration_ms ?? ''}</td>
+      <td>${bodyStr ? `<details><summary>view (${bodyStr.length}b)</summary><pre>${esc(bodyStr)}</pre></details>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+if (base.value && key.value) f.dispatchEvent(new Event('submit'));
+</script>

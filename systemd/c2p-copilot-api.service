@@ -1,0 +1,14 @@
+[Unit]
+Description=copilot-api upstream (c2p)
+After=network-online.target
+PartOf=c2p.target
+
+[Service]
+Type=simple
+WorkingDirectory=@PROJECT@
+ExecStart=/usr/bin/env npx --yes copilot-api@latest start --port 4141 --rate-limit 10 --wait
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=c2p.target

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# bin/c2p — wrapper that runs the CLI from the project's venv if present.
+set -e
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -x "$HERE/.venv/bin/c2p" ]; then
+  exec "$HERE/.venv/bin/c2p" "$@"
+fi
+if [ -x "$HERE/.venv/bin/python" ]; then
+  exec "$HERE/.venv/bin/python" -m c2p.cli "$@"
+fi
+exec python3 -m c2p.cli "$@"

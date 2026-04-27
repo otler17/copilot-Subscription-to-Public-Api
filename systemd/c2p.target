@@ -1,0 +1,6 @@
+[Unit]
+Description=copilot-Api-to-Public-Api stack
+Wants=c2p-copilot-api.service c2p-gateway.service c2p-tunnel.service
+
+[Install]
+WantedBy=default.target

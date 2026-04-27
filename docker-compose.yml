@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  copilot-api:
+    image: node:20-bookworm-slim
+    network_mode: host
+    working_dir: /work
+    volumes:
+      - ./data/copilot-api:/root/.local/share/copilot-api
+    command: >
+      sh -c "npx --yes copilot-api@latest start --port 4141 --rate-limit 10 --wait"
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+    environment:
+      - C2P_UPSTREAM=http://127.0.0.1:4141
+      - C2P_GATEWAY_HOST=127.0.0.1
+      - C2P_GATEWAY_PORT=8787
+    command: ["python", "-m", "uvicorn", "c2p.app:app", "--host", "127.0.0.1", "--port", "8787"]
+    depends_on: [copilot-api]
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    network_mode: host
+    command: ["tunnel", "--url", "http://127.0.0.1:8787", "--no-autoupdate"]
+    depends_on: [gateway]
+    restart: unless-stopped
