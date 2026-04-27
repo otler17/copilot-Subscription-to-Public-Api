@@ -14,7 +14,7 @@ from . import SETTINGS
 from . import keystore
 
 
-app = FastAPI(title="copilot-Api-to-Public-Api gateway")
+app = FastAPI(title="copilot-Subscription-to-Public-Api gateway")
 client = httpx.AsyncClient(base_url=SETTINGS.upstream_url, timeout=httpx.Timeout(600.0))
 
 # in-memory sliding window of request timestamps per key for RPM enforcement
@@ -118,7 +118,7 @@ async def index():
     return """<!doctype html><meta charset=utf-8>
 <title>c2p gateway</title>
 <style>body{font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;color:#222}</style>
-<h1>copilot-Api-to-Public-Api</h1>
+<h1>copilot-Subscription-to-Public-Api</h1>
 <p>This is a private gateway. Use an OpenAI-compatible client with the API
 key your administrator gave you.</p>
 <p>Base URL: <code id=u></code></p>

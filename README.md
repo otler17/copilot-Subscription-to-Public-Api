@@ -1,4 +1,4 @@
-# copilot-Api-to-Public-Api
+# copilot-Subscription-to-Public-Api
 
 Turn a locally-running [`copilot-api`](https://github.com/ericc-ch/copilot-api)
 instance into a **public, OpenAI-compatible API** that you can share with anyone
@@ -75,8 +75,8 @@ key auth, quotas, logging, and a public tunnel on top.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<you>/copilot-Api-to-Public-Api.git
-cd copilot-Api-to-Public-Api
+git clone https://github.com/<you>/copilot-Subscription-to-Public-Api.git
+cd copilot-Subscription-to-Public-Api
 
 # 1. install Python deps + cloudflared
 make install
@@ -214,7 +214,7 @@ This installs three units: `c2p-copilot-api.service`, `c2p-gateway.service`,
 ## 📁 Layout
 
 ```
-copilot-Api-to-Public-Api/
+copilot-Subscription-to-Public-Api/
 ├── README.md
 ├── LICENSE
 ├── Makefile
