@@ -33,6 +33,10 @@ def _extract_token(request: Request) -> str:
         token = auth.split(None, 1)[1].strip()
         if token:
             return token
+    # Anthropic SDK / Claude Code use the x-api-key header
+    xkey = request.headers.get("x-api-key", "").strip()
+    if xkey:
+        return xkey
     qp = request.query_params
     return (qp.get("key") or qp.get("api_key") or "").strip()
 
@@ -117,13 +121,18 @@ async def usage_summary(request: Request, limit: int = 100):
 async def index():
     return """<!doctype html><meta charset=utf-8>
 <title>c2p gateway</title>
-<style>body{font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;color:#222}</style>
+<style>body{font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;color:#222}code{background:#f4f4f4;padding:.1rem .3rem;border-radius:3px}</style>
 <h1>copilot-Subscription-to-Public-Api</h1>
-<p>This is a private gateway. Use an OpenAI-compatible client with the API
-key your administrator gave you.</p>
-<p>Base URL: <code id=u></code></p>
+<p>This is a private gateway. Use the API key your administrator gave you with
+either an OpenAI-compatible or an Anthropic-compatible client.</p>
+<p><b>OpenAI base URL:</b> <code id=u></code><br>
+<b>Anthropic base URL:</b> <code id=a></code></p>
 <p>Tracker: <code>/usage-summary?key=sk-...</code></p>
-<script>document.getElementById('u').textContent=location.origin+'/v1'</script>
+<script>
+  const o=location.origin;
+  document.getElementById('u').textContent=o+'/v1';
+  document.getElementById('a').textContent=o;
+</script>
 """
 
 
@@ -147,7 +156,7 @@ async def proxy(path: str, request: Request):
     _enforce_rpm(key)
 
     headers = {k: v for k, v in request.headers.items()
-               if k.lower() not in ("host", "authorization", "content-length")}
+               if k.lower() not in ("host", "authorization", "x-api-key", "content-length")}
     headers["authorization"] = "Bearer dummy"
 
     upstream_url = "/" + path

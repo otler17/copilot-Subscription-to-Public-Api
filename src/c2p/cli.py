@@ -48,7 +48,9 @@ def start():
     out = runner.start_all()
     console.print(json.dumps({k: v for k, v in out.items() if k != "tunnel_url"}, indent=2))
     if out.get("tunnel_url"):
-        console.print(f"\n[bold green]Public URL:[/] {out['tunnel_url']}/v1")
+        url = out["tunnel_url"]
+        console.print(f"\n[bold green]OpenAI base URL:[/]    {url}/v1")
+        console.print(f"[bold green]Anthropic base URL:[/] {url}")
     else:
         console.print("[yellow]Tunnel URL not detected yet — run `c2p status` in a few seconds.[/]")
 
@@ -74,8 +76,9 @@ def status():
     console.print(t)
 
     if url:
-        console.print(f"\n[bold]Public URL:[/] [cyan]{url}/v1[/]")
-        console.print(f"[bold]Tracker:[/]   [cyan]{url}/usage-summary?key=<your-key>[/]")
+        console.print(f"\n[bold]OpenAI base URL:[/]    [cyan]{url}/v1[/]")
+        console.print(f"[bold]Anthropic base URL:[/] [cyan]{url}[/]   [dim](for Anthropic SDK / Claude Code)[/]")
+        console.print(f"[bold]Tracker:[/]            [cyan]{url}/usage-summary?key=<your-key>[/]")
     else:
         console.print("\n[yellow]No tunnel URL recorded yet.[/]")
 

@@ -11,8 +11,9 @@ client app  ──HTTPS──►  Cloudflare Tunnel  ──►  c2p auth gateway
 
 ## ✨ Features
 
-- **OpenAI-compatible** — drop-in replacement for the OpenAI Python/JS SDK,
-  Continue, Aider, Open WebUI, etc.
+- **OpenAI- & Anthropic-compatible** — drop-in for the OpenAI SDK
+  (Continue, Aider, Open WebUI, …) **and** for the Anthropic SDK / Claude Code
+  via `/v1/messages`.
 - **API key auth** — issue, list, and revoke `sk-...` keys with a single CLI.
 - **Per-key tracking** — every request logged with model, prompt, response,
   status, latency, IP.
@@ -136,6 +137,16 @@ c2p models          # list models exposed by the upstream copilot-api
 
 ## 🔑 Using the key from a client
 
+The gateway speaks **two protocols** on the same tunnel — pick whichever your
+client supports:
+
+| Style | Base URL | Header |
+|---|---|---|
+| OpenAI-compatible | `https://<tunnel>.trycloudflare.com/v1` | `Authorization: Bearer sk-...` |
+| Anthropic-compatible | `https://<tunnel>.trycloudflare.com` | `x-api-key: sk-...` |
+
+### OpenAI SDK (Python)
+
 ```python
 from openai import OpenAI
 
@@ -150,8 +161,35 @@ resp = c.chat.completions.create(
 print(resp.choices[0].message.content)
 ```
 
-Anthropic-style endpoints (`/v1/messages`) are also forwarded if `copilot-api`
-is configured for them.
+### Anthropic SDK (Python)
+
+```python
+from anthropic import Anthropic
+
+c = Anthropic(
+    base_url="https://<your-tunnel>.trycloudflare.com",
+    api_key="sk-friend-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+)
+msg = c.messages.create(
+    model="claude-sonnet-4",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "hello!"}],
+)
+print(msg.content[0].text)
+```
+
+### Claude Code CLI
+
+```bash
+export ANTHROPIC_BASE_URL="https://<your-tunnel>.trycloudflare.com"
+export ANTHROPIC_AUTH_TOKEN="sk-friend-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+claude
+```
+
+Both styles authenticate with the **same** `sk-...` key — the gateway accepts
+`Authorization: Bearer`, `x-api-key`, or `?key=` query param interchangeably,
+and the Anthropic `/v1/messages` requests are forwarded straight to
+`copilot-api`'s native Anthropic endpoint.
 
 ---
 

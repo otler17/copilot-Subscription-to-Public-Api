@@ -36,6 +36,28 @@ def test_invalid_key(client):
     assert r.status_code == 401
 
 
+def test_invalid_x_api_key(client):
+    # Anthropic SDK uses the x-api-key header instead of Authorization
+    r = client.post("/v1/messages", headers={"x-api-key": "sk-bogus"})
+    assert r.status_code == 401
+
+
+def test_valid_x_api_key_passes_auth(client, monkeypatch):
+    """A valid x-api-key should pass auth (upstream may then fail with 502 — that's fine)."""
+    k = keystore.add_key("anthropic-test", max_rpm=0)
+    try:
+        r = client.post(
+            "/v1/messages",
+            headers={"x-api-key": k.secret, "anthropic-version": "2023-06-01"},
+            json={"model": "claude-sonnet-4", "max_tokens": 8,
+                  "messages": [{"role": "user", "content": "hi"}]},
+        )
+        # we don't have a live upstream in tests; what matters is auth was accepted
+        assert r.status_code != 401
+    finally:
+        keystore.revoke("anthropic-test")
+
+
 def test_keystore_roundtrip():
     k = keystore.add_key("unit-test", max_rpm=5, allow_models=["gpt-4.1"])
     assert k.secret.startswith("sk-unit-test-")
