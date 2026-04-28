@@ -134,6 +134,7 @@ c2p start           # start all 3 services in the background
 c2p stop            # stop them
 c2p status          # public URL, keys, PIDs, model list
 c2p logs [--tail N] # stream the request log
+c2p doctor          # end-to-end health check (upstream + gateway + tunnel + round-trip)
 
 c2p key add --name <label> [--max-rpm N] [--allow-models a,b]
 c2p key list
@@ -248,6 +249,14 @@ This installs three units: `c2p-copilot-api.service`, `c2p-gateway.service`,
 
 ## ❓ Troubleshooting
 
+**Tip:** run `./bin/c2p doctor` — it tests every layer (copilot-api → gateway
+→ tunnel → end-to-end round-trip via the public URL) and tells you exactly
+where it breaks.
+
+- **Claude Code says `ConnectionRefused` / `FailedToOpenSocket`** — almost
+  always a stale tunnel URL. Cloudflare quick-tunnels mint a new hostname on
+  every restart. Always re-share the URL from `./bin/c2p status` (or
+  `c2p doctor`) after a restart, not the one you copied last time.
 - **`copilot-api` won't start** — run `npx copilot-api auth` once to log in.
 - **Tunnel URL changed after reboot** — quick tunnels are ephemeral. For a
   stable URL, set `TUNNEL_HOSTNAME=copilot.yourdomain.com` and follow

@@ -134,15 +134,19 @@ _TUNNEL_RE = re.compile(r"https://[a-zA-Z0-9.-]+\.trycloudflare\.com")
 
 
 def detect_tunnel_url(timeout: float = 30.0) -> Optional[str]:
-    """Tail the tunnel log file until we find the assigned hostname."""
+    """Tail the tunnel log until we find the *most recent* assigned hostname.
+
+    Cloudflare quick tunnels get a fresh hostname on every restart, but the log
+    is appended to, so we must always pick the last match — not the first.
+    """
     log = SETTINGS.log_dir / "tunnel.log"
     deadline = time.time() + timeout
     while time.time() < deadline:
         if log.exists():
             text = log.read_text(errors="replace")
-            m = _TUNNEL_RE.search(text)
-            if m:
-                url = m.group(0)
+            matches = _TUNNEL_RE.findall(text)
+            if matches:
+                url = matches[-1]
                 SETTINGS.tunnel_url_file.write_text(url + "\n")
                 return url
         time.sleep(0.5)
@@ -157,6 +161,15 @@ def cached_tunnel_url() -> Optional[str]:
 
 def start_all() -> dict:
     out = {}
+    # quick tunnels mint a new hostname on every restart; truncate the log so
+    # detect_tunnel_url() can't pick up a stale URL from a previous run.
+    tunnel_log = SETTINGS.log_dir / "tunnel.log"
+    try:
+        tunnel_log.write_text("")
+    except OSError:
+        pass
+    SETTINGS.tunnel_url_file.unlink(missing_ok=True)
+
     for s in services():
         out[s.name] = s.start()
         time.sleep(1.0)

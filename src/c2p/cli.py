@@ -252,7 +252,9 @@ def stop():
 def status():
     """Show service status, tunnel URL, and keys."""
     svc = runner.status_all()
-    url = runner.cached_tunnel_url() or runner.detect_tunnel_url(timeout=2.0)
+    # Always try to refresh from the live log first — the cached URL may be
+    # stale if the tunnel restarted (quick tunnels mint a new hostname).
+    url = runner.detect_tunnel_url(timeout=2.0) or runner.cached_tunnel_url()
 
     t = Table(title="services")
     t.add_column("name"); t.add_column("pid"); t.add_column("log")
@@ -311,6 +313,99 @@ def models():
     except Exception as e:
         console.print(f"[red]error:[/] {e}")
         raise typer.Exit(1)
+
+
+@app.command()
+def doctor():
+    """End-to-end health check: upstream → gateway → tunnel → round-trip.
+
+    Prints the live public URL and tells you exactly which layer is broken
+    if a client (Claude Code, Anthropic SDK, OpenAI SDK) can't connect.
+    """
+    import httpx
+
+    fail = 0
+
+    def _row(label: str, ok: bool, detail: str = "") -> None:
+        nonlocal fail
+        if ok:
+            console.print(f"  [green]✓[/] {label}  [dim]{detail}[/]")
+        else:
+            console.print(f"  [red]✗[/] {label}  [yellow]{detail}[/]")
+            fail += 1
+
+    console.print("[bold]c2p doctor[/]")
+
+    # 1. processes
+    svc = runner.status_all()
+    _row("copilot-api process", bool(svc.get("copilot-api")),
+         f"pid {svc.get('copilot-api')}" if svc.get("copilot-api") else "down — run `c2p start`")
+    _row("gateway process", bool(svc.get("gateway")),
+         f"pid {svc.get('gateway')}" if svc.get("gateway") else "down")
+    _row("tunnel process", bool(svc.get("tunnel")),
+         f"pid {svc.get('tunnel')}" if svc.get("tunnel") else "down")
+
+    # 2. upstream reachable
+    try:
+        r = httpx.get(f"{SETTINGS.upstream_url}/v1/models", timeout=4.0)
+        _row(f"upstream {SETTINGS.upstream_url}", r.status_code == 200,
+             f"HTTP {r.status_code}, {len(r.json().get('data', []))} models")
+    except Exception as e:
+        _row(f"upstream {SETTINGS.upstream_url}", False, str(e))
+
+    # 3. gateway reachable
+    base_local = f"http://{SETTINGS.gateway_host}:{SETTINGS.gateway_port}"
+    try:
+        r = httpx.get(f"{base_local}/healthz", timeout=4.0)
+        _row(f"gateway {base_local}", r.status_code == 200, f"HTTP {r.status_code}")
+    except Exception as e:
+        _row(f"gateway {base_local}", False, str(e))
+
+    # 4. live tunnel URL (always re-detect)
+    url = runner.detect_tunnel_url(timeout=3.0)
+    cached = runner.cached_tunnel_url()
+    if url and cached and url != cached:
+        console.print(f"  [yellow]![/] cached URL was stale ({cached}); "
+                      f"updated to live URL")
+    _row("tunnel URL detected", bool(url), url or "no trycloudflare URL in tunnel log yet")
+
+    # 5. end-to-end round-trip via the public URL with a real key
+    keys = [k for k in keystore.list_keys() if not k.revoked]
+    if not keys:
+        _row("round-trip via tunnel", False,
+             "no API keys; run `c2p key add --name friend`")
+    elif not url:
+        _row("round-trip via tunnel", False, "no tunnel URL")
+    else:
+        key = keys[0]
+        try:
+            r = httpx.post(
+                f"{url}/v1/messages",
+                headers={
+                    "x-api-key": key.secret,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={"model": "claude-opus-4.7", "max_tokens": 8,
+                      "messages": [{"role": "user", "content": "ping"}]},
+                timeout=20.0,
+            )
+            ok = r.status_code == 200
+            _row("round-trip /v1/messages via tunnel", ok,
+                 f"HTTP {r.status_code} key='{key.name}'")
+            if not ok:
+                console.print(f"    [dim]{r.text[:300]}[/]")
+        except Exception as e:
+            _row("round-trip /v1/messages via tunnel", False, f"{type(e).__name__}: {e}")
+
+    if fail:
+        console.print(f"\n[red]{fail} check(s) failed.[/]  Common fixes:")
+        console.print("  • run [bold]c2p stop && c2p start[/] (or [bold]c2p setup[/]) to refresh")
+        console.print("  • cloudflare quick-tunnel URLs change on every restart — "
+                      "always re-share the URL printed by [bold]c2p status[/]")
+        console.print("  • check [bold]data/logs/{copilot-api,gateway,tunnel}.log[/]")
+        raise typer.Exit(1)
+    console.print("\n[bold green]all good — share the tunnel URL above with your client.[/]")
 
 
 # ---------- key subcommands ----------
