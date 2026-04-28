@@ -96,10 +96,37 @@ def _pick_or_create_key() -> keystore.ApiKey:
 
 
 def _summary_panel(url: Optional[str], key: keystore.ApiKey) -> None:
-    base_oai = f"{url}/v1" if url else "http://127.0.0.1:8787/v1"
-    base_ant = url or "http://127.0.0.1:8787"
     secret = key.secret
 
+    if not url:
+        # Don't print 127.0.0.1 as a "public" URL — that's useless to share
+        # and it's exactly what tripped users up before.
+        console.print(Panel(
+            "\n".join([
+                f"[bold]API key (name: {key.name}):[/]",
+                f"  [cyan]{secret}[/]",
+                "",
+                "[yellow]⚠  Public tunnel URL was not detected in time.[/]",
+                "",
+                "Cloudflare quick-tunnels can take 30–60s on first start. Once the",
+                "tunnel registers a hostname, get it with either of:",
+                "",
+                "  [bold]./bin/c2p status[/]",
+                "  [bold]./bin/c2p doctor[/]   [dim](also runs an end-to-end round-trip)[/]",
+                "",
+                "Then export it for your client:",
+                f"  [dim]export ANTHROPIC_BASE_URL=\"<paste-public-URL>\"[/]",
+                f"  [dim]export ANTHROPIC_AUTH_TOKEN=\"{secret}\"[/]",
+                "",
+                "[dim]If it still doesn't appear, check data/logs/tunnel.log[/]",
+            ]),
+            title="🟡 c2p is up — waiting on tunnel URL",
+            border_style="yellow",
+        ))
+        return
+
+    base_oai = f"{url}/v1"
+    base_ant = url
     body_lines = [
         f"[bold]API key (name: {key.name}):[/]",
         f"  [cyan]{secret}[/]",
@@ -119,10 +146,12 @@ def _summary_panel(url: Optional[str], key: keystore.ApiKey) -> None:
         f"  [dim]export ANTHROPIC_BASE_URL=\"{base_ant}\"[/]",
         f"  [dim]export ANTHROPIC_AUTH_TOKEN=\"{secret}\"[/]",
         f"  [dim]claude[/]",
+        "",
+        f"[bold]Tracker:[/] [cyan]{url}/usage-summary?key={secret}[/]",
+        "",
+        "[dim]Quick-tunnel URLs change on every restart — re-run "
+        "`c2p status` after any restart.[/]",
     ]
-    if url:
-        body_lines += ["",
-                       f"[bold]Tracker:[/] [cyan]{url}/usage-summary?key={secret}[/]"]
     console.print(Panel("\n".join(body_lines),
                         title="🎉 c2p is up", border_style="green"))
 
@@ -206,11 +235,22 @@ def setup(
 
     # 5. tunnel URL + summary
     _step(5, total, "Detecting public tunnel URL")
-    url = out.get("tunnel_url") or runner.detect_tunnel_url(timeout=20.0)
+    url = out.get("tunnel_url")
+    if not url:
+        # Quick-tunnels routinely take 30-60s on first start. Poll the log
+        # actively with a live spinner so the user sees progress.
+        deadline = time.time() + 75.0
+        with console.status("  waiting for cloudflared to assign a hostname (up to 75s)..."):
+            while time.time() < deadline and not url:
+                url = runner.detect_tunnel_url(timeout=2.0)
+                if url:
+                    break
+                time.sleep(1.5)
     if url:
         _ok(url)
     else:
-        _warn("tunnel URL not detected yet — run `c2p status` in a few seconds")
+        _warn("tunnel URL still not visible after 75s — check data/logs/tunnel.log")
+        _warn("you can finish setup later with: c2p doctor")
 
     _summary_panel(url, key)
 
