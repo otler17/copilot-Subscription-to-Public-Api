@@ -1,8 +1,11 @@
-.PHONY: install auth up down status logs key models systemd clean test
+.PHONY: setup install auth up down status logs key models systemd clean test
 
 PY ?= python3
 VENV ?= .venv
 BIN := $(VENV)/bin
+
+# Default: friendly one-command journey.
+.DEFAULT_GOAL := setup
 
 $(BIN)/python:
 	$(PY) -m venv $(VENV)
@@ -11,7 +14,10 @@ $(BIN)/python:
 
 install: $(BIN)/python
 	bash scripts/cloudflared-install.sh
-	@echo "✅ install done. Next: 'make auth' then 'make up'."
+	@echo "✅ install done. Next: 'make setup' (or 'make auth' && 'make up')."
+
+setup: $(BIN)/python
+	$(BIN)/c2p setup
 
 auth:
 	npx --yes copilot-api@latest auth

@@ -79,23 +79,32 @@ key auth, quotas, logging, and a public tunnel on top.
 git clone https://github.com/otler17/copilot-Subscription-to-Public-Api.git
 cd copilot-Subscription-to-Public-Api
 
-# 1. install Python deps + cloudflared
-make install
-
-# 2. one-time GitHub Copilot device-flow login (opens a URL, paste the code)
-make auth
-
-# 3. issue a key for your friend
-./bin/c2p key add --name friend --max-rpm 30
-
-# 4. start everything (copilot-api + auth gateway + cloudflared)
-make up
-
-# 5. read the public URL + the friend's key
-./bin/c2p status
+make            # one-command interactive setup
 ```
 
-The output of `c2p status` is what you send to your friend. Done.
+That's it. `make` (alias for `make setup`) runs `c2p setup`, which:
+
+1. checks Node.js + downloads `cloudflared` if missing,
+2. runs the GitHub Copilot device-flow login (skipped if already logged in),
+3. creates your first API key (skipped/extended if keys already exist),
+4. starts `copilot-api` + the auth gateway + the Cloudflare tunnel,
+5. prints a copy-pasteable summary with both the OpenAI and Anthropic base
+   URLs and ready-to-use SDK / Claude Code snippets.
+
+Re-run `make` anytime — every step is idempotent. For non-interactive use:
+
+```bash
+./bin/c2p setup --yes        # accept all defaults
+./bin/c2p setup --skip-start # configure only, don't launch services
+```
+
+When you want to inspect or manage things later:
+
+```bash
+./bin/c2p status             # public URL, keys, PIDs, model list
+./bin/c2p key add --name app-mobile --max-rpm 60
+./bin/c2p stop
+```
 
 ---
 
@@ -118,6 +127,7 @@ default. Override with the `C2P_DATA_DIR` env var.
 ## 🗂 CLI overview
 
 ```
+c2p setup           # ⭐ one-command interactive onboarding (deps, auth, key, start)
 c2p init            # create data/, write defaults
 c2p auth            # device-flow login to GitHub Copilot (delegates to copilot-api)
 c2p start           # start all 3 services in the background
