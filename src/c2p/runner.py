@@ -10,6 +10,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -115,7 +116,7 @@ def services() -> list[Service]:
     )
     gateway = Service(
         name="gateway",
-        cmd=["python", "-m", "uvicorn", "c2p.app:app",
+        cmd=[sys.executable, "-m", "uvicorn", "c2p.app:app",
              "--host", SETTINGS.gateway_host,
              "--port", str(SETTINGS.gateway_port),
              "--log-level", "warning"],
