@@ -154,9 +154,20 @@ def detect_tunnel_url(timeout: float = 30.0) -> Optional[str]:
 
 
 def cached_tunnel_url() -> Optional[str]:
-    if SETTINGS.tunnel_url_file.exists():
-        return SETTINGS.tunnel_url_file.read_text().strip() or None
-    return None
+    """Return the cached tunnel URL, but only if the tunnel service is alive.
+
+    A leftover ``tunnel_url.txt`` from a previous run would otherwise mislead
+    callers (e.g. ``c2p status``) into reporting a dead public URL after a
+    crash or external kill of cloudflared.
+    """
+    if not SETTINGS.tunnel_url_file.exists():
+        return None
+    for s in services():
+        if s.name == "tunnel":
+            if not s.is_running():
+                return None
+            break
+    return SETTINGS.tunnel_url_file.read_text().strip() or None
 
 
 def start_all() -> dict:
